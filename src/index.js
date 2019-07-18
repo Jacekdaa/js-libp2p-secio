@@ -5,7 +5,6 @@ const Connection = require('interface-connection').Connection
 const assert = require('assert')
 const PeerInfo = require('peer-info')
 const debug = require('debug')
-const once = require('once')
 const log = debug('libp2p:secio')
 log.error = debug('libp2p:secio:error')
 

@@ -17,7 +17,7 @@ const defer = (timeout) => {
     d()
   }
 
-  let prom = new Promise((resolve, reject) => {
+  const prom = new Promise((resolve, reject) => {
     _resolve = resolve
     _reject = reject
   })

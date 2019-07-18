@@ -144,8 +144,8 @@ describe('secio', () => {
     const p = pair()
 
     // we are using peerC Id on purpose to fail
-    const {awaitConnected: prom1} = secio.encrypt(peerA, new Connection(p[0]), peerC)
-    const {awaitConnected: prom2} = secio.encrypt(peerB, new Connection(p[1]), peerA)
+    const { awaitConnected: prom1 } = secio.encrypt(peerA, new Connection(p[0]), peerC)
+    const { awaitConnected: prom2 } = secio.encrypt(peerB, new Connection(p[1]), peerA)
 
     const errs = await Promise.all([prom1, prom2].map(catcher))
     expect(errs.filter(Boolean).length).to.equal(2)

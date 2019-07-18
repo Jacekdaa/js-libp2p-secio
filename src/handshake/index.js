@@ -7,7 +7,7 @@ const finish = require('./finish')
 // Performs initial communication over insecure channel to share keys, IDs,
 // and initiate communication, assigning all necessary params.
 module.exports = function handshake (state) {
-  const {awaitConnected} = state
+  const { awaitConnected } = state
 
   const main = async () => {
     await propose(state)

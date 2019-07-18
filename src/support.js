@@ -38,8 +38,8 @@ exports.theBest = (order, p1, p2) => {
     return p1[0]
   }
 
-  for (let firstCandidate of first) {
-    for (let secondCandidate of second) {
+  for (const firstCandidate of first) {
+    for (const secondCandidate of second) {
       if (firstCandidate === secondCandidate) {
         return firstCandidate
       }

@@ -20,7 +20,7 @@ module.exports = {
     const timeout = 60 * 1000 * 5
     const state = new State(localId, remoteId, timeout)
 
-    const {handler, awaitConnected} = handshake(state)
+    const { handler, awaitConnected } = handshake(state)
 
     const encryptedConnection = new Connection(undefined, conn)
     encryptedConnection.awaitConnected = (async () => { // NOTE: all errors this throws should ideally be also sent down the wire of the connection

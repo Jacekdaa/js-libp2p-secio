@@ -10,7 +10,6 @@ const pull = require('pull-stream')
 const pullGoodbye = require('pull-goodbye')
 const WS = require('libp2p-websockets')
 const PeerId = require('peer-id')
-const parallel = require('async/parallel')
 
 const peerNodeJSON = require('./fixtures/peer-node.json')
 const peerBrowserJSON = require('./fixtures/peer-browser.json')
@@ -22,26 +21,21 @@ describe('secio between browser <-> nodejs through websockets', () => {
   let conn
   let encryptedConn
 
-  before((done) => {
-    parallel([
-      (cb) => PeerId.createFromJSON(peerNodeJSON, cb),
-      (cb) => PeerId.createFromJSON(peerBrowserJSON, cb),
-
-      (cb) => {
+  before(async () => {
+    const res = await Promise.all([
+      PeerId.createFromJSON(peerNodeJSON),
+      PeerId.createFromJSON(peerBrowserJSON),
+      new Promise((resolve, reject) => {
         const ws = new WS()
-        conn = ws.dial(ma, cb)
-      }
-    ], (err, res) => {
-      expect(err).to.not.exist()
-
-      const peerIdNode = res[0]
-      const peerIdBrowser = res[1]
-
-      encryptedConn = secio.encrypt(peerIdBrowser, conn, peerIdNode, (err) => {
-        expect(err).to.not.exist()
+        conn = ws.dial(ma, (err, res) => err ? reject(err) : resolve(res))
       })
-      done()
-    })
+    ])
+
+    const peerIdNode = res[0]
+    const peerIdBrowser = res[1]
+
+    encryptedConn = secio.encrypt(peerIdBrowser, conn, peerIdNode)
+    await encryptedConn.awaitConnected
   })
 
   it('echo', (done) => {

@@ -24,7 +24,7 @@ const defer = (timeout) => {
 
   prom.resolve = (...a) => process.nextTick(() => lock(() => _resolve(...a)))
   prom.reject = (...a) => process.nextTick(() => lock(() => _reject(...a)))
-  setTimeout(() => prom.reject(new Error('Timeout')), 10 * 1000)
+  setTimeout(() => prom.reject(new Error('Timeout')), timeout)
 
   return prom
 }

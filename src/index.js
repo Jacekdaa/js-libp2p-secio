@@ -23,7 +23,7 @@ module.exports = {
     const {handler, awaitConnected} = handshake(state)
 
     const encryptedConnection = new Connection(undefined, conn)
-    encryptedConnection.awaitConnected = async () => { // NOTE: all errors this throws should ideally be also sent down the wire of the connection
+    encryptedConnection.awaitConnected = (async () => { // NOTE: all errors this throws should ideally be also sent down the wire of the connection
       await awaitConnected
 
       await new Promise((resolve, reject) => { // TODO: promisify
@@ -37,7 +37,7 @@ module.exports = {
           resolve()
         })
       })
-    }
+    })()
 
     pull(
       conn,

@@ -13,7 +13,7 @@ const State = require('./state')
 
 module.exports = {
   tag: '/secio/1.0.0',
-  async encrypt (localId, conn, remoteId) {
+  encrypt (localId, conn, remoteId) {
     assert(localId, 'no local private key provided')
     assert(conn, 'no connection for the handshake  provided')
 

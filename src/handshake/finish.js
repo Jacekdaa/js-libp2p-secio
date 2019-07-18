@@ -13,12 +13,12 @@ const crypto = require('./crypto')
 
 // step 3. Finish
 // -- send expected message to verify encryption works (send local nonce)
-module.exports = function finish (state, callback) {
+module.exports = async function finish (state) {
   log('3. finish - start')
 
   const proto = state.protocols
   const stream = state.shake.rest()
-  const shake = handshake({ timeout: state.timeout }, (err) => {
+  const shake = handshake({ timeout: state.timeout }, (err) => { // TODO: refactor this to catch error
     if (err) {
       throw err
     }
@@ -32,30 +32,27 @@ module.exports = function finish (state, callback) {
     stream
   )
 
+  const fail = (err) => {
+    log.error(err)
+    state.secure.resolve({
+      source: pullError(err),
+      sink (read) {
+      }
+    })
+    throw err
+  }
+
   shake.handshake.write(state.proposal.in.rand)
-  shake.handshake.read(state.proposal.in.rand.length, (err, nonceBack) => {
-    const fail = (err) => {
-      log.error(err)
-      state.secure.resolve({
-        source: pullError(err),
-        sink (read) {
-        }
-      })
-      callback(err)
-    }
+  const nonceBack = await shake.handshake.read(state.proposal.in.rand.length) // FIXME: this isn't async? need prom() wrapper
 
-    if (err) return fail(err)
+  try {
+    crypto.verifyNonce(state, nonceBack)
+  } catch (err) {
+    return fail(err)
+  }
 
-    try {
-      crypto.verifyNonce(state, nonceBack)
-    } catch (err) {
-      return fail(err)
-    }
+  log('3. finish - finish')
 
-    log('3. finish - finish')
-
-    // Awesome that's all folks.
-    state.secure.resolve(shake.handshake.rest())
-    callback()
-  })
+  // Awesome that's all folks.
+  state.secure.resolve(shake.handshake.rest())
 }

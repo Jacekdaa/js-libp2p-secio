@@ -1,12 +1,13 @@
 'use strict'
 
+/* eslint-disable no-console */
+
 const Benchmark = require('benchmark')
 const pull = require('pull-stream/pull')
 const infinite = require('pull-stream/sources/infinite')
 const take = require('pull-stream/throughs/take')
 const drain = require('pull-stream/sinks/drain')
 const Connection = require('interface-connection').Connection
-const parallel = require('async/parallel')
 const pair = require('pull-pair/duplex')
 const PeerId = require('peer-id')
 
@@ -39,23 +40,20 @@ function sendData (a, b, opts, finish) {
   )
 }
 
-function ifErr (err) {
-  if (err) {
-    throw err
-  }
+function ifErr (conn) {
+  conn.awaitConnected.catch(err => {
+    console.error(err.stack)
+    throw err // TODO: make this better
+  })
+  return conn
 }
 
-suite.add('create peers for test', (deferred) => {
-  parallel([
-    (cb) => PeerId.createFromJSON(require('./peer-a'), cb),
-    (cb) => PeerId.createFromJSON(require('./peer-b'), cb)
-  ], (err, _peers) => {
-    if (err) { throw err }
-    peers = _peers
-
-    deferred.resolve()
-  })
-}, { defer: true })
+suite.add('create peers for test', async () => {
+  peers = await Promise.all([
+    PeerId.createFromJSON(require('./peer-a')),
+    PeerId.createFromJSON(require('./peer-b'))
+  ])
+})
 
 suite.add('establish an encrypted channel', (deferred) => {
   const p = pair()
@@ -63,8 +61,8 @@ suite.add('establish an encrypted channel', (deferred) => {
   const peerA = peers[0]
   const peerB = peers[1]
 
-  const aToB = secio.encrypt(peerA, new Connection(p[0]), peerB, ifErr)
-  const bToA = secio.encrypt(peerB, new Connection(p[1]), peerA, ifErr)
+  const aToB = ifErr(secio.encrypt(peerA, new Connection(p[0]), peerB))
+  const bToA = ifErr(secio.encrypt(peerB, new Connection(p[1]), peerA))
 
   sendData(aToB, bToA, {}, deferred)
 }, { defer: true })
@@ -93,8 +91,8 @@ cases.forEach((el) => {
     const peerA = peers[0]
     const peerB = peers[1]
 
-    const aToB = secio.encrypt(peerA, new Connection(p[0]), peerB, ifErr)
-    const bToA = secio.encrypt(peerB, new Connection(p[1]), peerA, ifErr)
+    const aToB = ifErr(secio.encrypt(peerA, new Connection(p[0]), peerB))
+    const bToA = ifErr(secio.encrypt(peerB, new Connection(p[1]), peerA))
 
     sendData(aToB, bToA, { times: times, size: size }, deferred)
   }, { defer: true })

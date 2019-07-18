@@ -4,6 +4,7 @@ const multiaddr = require('multiaddr')
 const pull = require('pull-stream')
 const WS = require('libp2p-websockets')
 const PeerId = require('peer-id')
+const prom = (fnc) => new Promise((resolve, reject) => fnc((err, res) => err ? reject(err) : resolve(res)))
 
 const secio = require('./src')
 
@@ -14,26 +15,22 @@ let listener
 module.exports = {
   hooks: {
     browser: {
-      pre: (done) => {
-        PeerId.createFromJSON(peerNodeJSON, (err, peerId) => {
-          if (err) { throw err }
+      pre: async () => {
+        const peerId = await PeerId.createFromJSON(peerNodeJSON)
+        const ws = new WS()
 
-          const ws = new WS()
+        listener = ws.createListener((conn) => {
+          const encryptedConn = secio.encrypt(peerId, conn, undefined)
+          encryptedConn.catch(err => { throw err }) // TODO: make this better
 
-          listener = ws.createListener((conn) => {
-            const encryptedConn = secio.encrypt(peerId, conn, undefined, (err) => {
-              if (err) { throw err }
-            })
-
-            // echo
-            pull(encryptedConn, encryptedConn)
-          })
-
-          listener.listen(ma, done)
+          // echo
+          pull(encryptedConn, encryptedConn)
         })
+
+        await prom(cb => listener.listen(ma, cb))
       },
-      post: (done) => {
-        listener.close(done)
+      post: async () => {
+        return prom(cb => listener.close(cb))
       }
     }
   }

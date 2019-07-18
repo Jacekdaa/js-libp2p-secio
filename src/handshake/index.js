@@ -1,30 +1,32 @@
 'use strict'
 
-const series = require('async/series')
-
 const propose = require('./propose')
 const exchange = require('./exchange')
 const finish = require('./finish')
 
 // Performs initial communication over insecure channel to share keys, IDs,
 // and initiate communication, assigning all necessary params.
-module.exports = function handshake (state, callback) {
-  series([
-    (cb) => propose(state, cb),
-    (cb) => exchange(state, cb),
-    (cb) => finish(state, cb)
-  ], (err) => {
+module.exports = function handshake (state) {
+  const {awaitConnected} = state
+
+  const main = async () => {
+    await propose(state)
+    await exchange(state)
+    await finish(state)
+  }
+
+  main().then(() => {
+    state.cleanSecrets()
+    awaitConnected.resolve() // TODO: maybe pass in the conn as argument here?
+  }).catch(err => {
     state.cleanSecrets()
 
-    if (err) {
-      if (err === true) {
-        err = new Error('Stream ended prematurely')
-      }
-      state.shake.abort(err)
+    if (err === true) {
+      err = new Error('Stream ended prematurely')
     }
 
-    // signal when the handshake is finished so that plumbing can happen
-    callback(err)
+    state.shake.abort(err) // send the error through the wire as well
+    awaitConnected.reject(err)
   })
 
   return state.stream

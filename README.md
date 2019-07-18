@@ -46,16 +46,17 @@ const secio = require('libp2p-secio')
 
 The current `secio` tag, usable in `multistream`.
 
-### `const encryptedConnection = secio.encrypt(localPeerId, plainTextConnection [, remotePeerId] [, callback])`
+### `const encryptedConnection = secio.encrypt(localPeerId, plainTextConnection [, remotePeerId])`
 
 - `localPeerId: PeerId` - A PeerId object containing the Private, Public and Id of our node.
 - `plainTextConnection: Connection` - The insecure connection to be secured.
 - `remotePeerId: PeerId` - A PeerId object containing the Public and/or Id of the node we are doing the SECIO handshake with.
-- `callback: Function` - Optional, Called if an error happens during the initialization.
 
 Returns an encrypted [Connection object](https://github.com/libp2p/interface-connection) that is the upgraded `plainTextConnection` with now having every byte encripted.
 
 Both plainTextConnection and encryptedConnection are at their base, PullStreams.
+
+NOTE: The `encryptedConnection` also has a Promise under the key `encryptedConnection.awaitConnected` which you can await to make sure no errors occured and catch any if there occured any.
 
 ### This module uses `pull-streams`
 

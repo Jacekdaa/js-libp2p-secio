@@ -14,42 +14,35 @@ const State = require('./state')
 
 module.exports = {
   tag: '/secio/1.0.0',
-  encrypt (localId, conn, remoteId, callback) {
+  async encrypt (localId, conn, remoteId) {
     assert(localId, 'no local private key provided')
     assert(conn, 'no connection for the handshake  provided')
 
-    if (typeof remoteId === 'function') {
-      callback = remoteId
-      remoteId = undefined
-    }
-
-    callback = once(callback || function (err) {
-      if (err) { log.error(err) }
-    })
-
     const timeout = 60 * 1000 * 5
+    const state = new State(localId, remoteId, timeout)
 
-    const state = new State(localId, remoteId, timeout, callback)
+    const {handler, awaitConnected} = handshake(state)
 
-    function finish (err) {
-      if (err) { return callback(err) }
+    const encryptedConnection = new Connection(undefined, conn)
+    encryptedConnection.awaitConnected = async () => { // NOTE: all errors this throws should ideally be also sent down the wire of the connection
+      await awaitConnected
 
-      conn.getPeerInfo((err, peerInfo) => {
-        encryptedConnection.setInnerConn(new Connection(state.secure, conn))
+      await new Promise((resolve, reject) => { // TODO: promisify
+        conn.getPeerInfo((err, peerInfo) => {
+          encryptedConnection.setInnerConn(new Connection(state.secure, conn))
 
-        if (err) { // no peerInfo yet, means I'm the receiver
-          encryptedConnection.setPeerInfo(new PeerInfo(state.id.remote))
-        }
+          if (err) { // no peerInfo yet, means I'm the receiver
+            encryptedConnection.setPeerInfo(new PeerInfo(state.id.remote))
+          }
 
-        callback()
+          resolve()
+        })
       })
     }
 
-    const encryptedConnection = new Connection(undefined, conn)
-
     pull(
       conn,
-      handshake(state, finish),
+      handler,
       conn
     )
 

@@ -21,48 +21,55 @@ const secio = require('../src')
 const State = require('../src/state')
 const handshake = require('../src/handshake')
 
+const catcher = (prom) => new Promise((resolve, reject) => {
+  prom.then(() => resolve(), resolve)
+})
+
 describe('secio', () => {
   let peerA
   let peerB
   let peerC
 
-  before((done) => {
-    parallel([
-      (cb) => PeerId.createFromJSON(require('./fixtures/peer-a'), cb),
-      (cb) => PeerId.createFromJSON(require('./fixtures/peer-b'), cb),
-      (cb) => PeerId.createFromJSON(require('./fixtures/peer-c'), cb)
-    ], (err, peers) => {
-      expect(err).to.not.exist()
-      peerA = peers[0]
-      peerB = peers[1]
-      peerC = peers[2]
-      done()
-    })
+  before(async () => {
+    const peers = await Promise.all([
+      PeerId.createFromJSON(require('./fixtures/peer-a')),
+      PeerId.createFromJSON(require('./fixtures/peer-b')),
+      PeerId.createFromJSON(require('./fixtures/peer-c'))
+    ])
+
+    peerA = peers[0]
+    peerB = peers[1]
+    peerC = peers[2]
   })
 
   it('exports a secio multicodec', () => {
     expect(secio.tag).to.equal('/secio/1.0.0')
   })
 
-  it('upgrades a connection', (done) => {
+  it('upgrades a connection', async () => {
     const p = pair()
 
     const aToB = secio.encrypt(peerA, new Connection(p[0]), peerB, (err) => expect(err).to.not.exist())
     const bToA = secio.encrypt(peerB, new Connection(p[1]), peerA, (err) => expect(err).to.not.exist())
+
+    const errs = await Promise.all([aToB.awaitConnected, bToA.awaitConnected].map(catcher))
+    expect(errs.filter(Boolean)).to.deep.equal([])
 
     pull(
       pull.values([Buffer.from('hello world')]),
       aToB
     )
 
-    pull(
-      bToA,
-      pull.collect((err, chunks) => {
-        expect(err).to.not.exist()
-        expect(chunks).to.eql([Buffer.from('hello world')])
-        done()
-      })
-    )
+    await new Promise((resolve, reject) => {
+      pull(
+        bToA,
+        pull.collect((err, chunks) => {
+          expect(err).to.not.exist()
+          expect(chunks).to.eql([Buffer.from('hello world')])
+          resolve()
+        })
+      )
+    })
   })
 
   it('works over multistream-select', (done) => {
@@ -133,43 +140,43 @@ describe('secio', () => {
     )
   })
 
-  it('fails if we dialed to the wrong peer', (done) => {
+  it('fails if we dialed to the wrong peer', async () => {
     const p = pair()
-    let count = 0
-
-    function check (err) {
-      expect(err).to.exist()
-      if (++count === 2) { done() }
-    }
 
     // we are using peerC Id on purpose to fail
-    secio.encrypt(peerA, new Connection(p[0]), peerC, check)
-    secio.encrypt(peerB, new Connection(p[1]), peerA, check)
+    const {awaitConnected: prom1} = secio.encrypt(peerA, new Connection(p[0]), peerC)
+    const {awaitConnected: prom2} = secio.encrypt(peerB, new Connection(p[1]), peerA)
+
+    const errs = await Promise.all([prom1, prom2].map(catcher))
+    expect(errs.filter(Boolean).length).to.equal(2)
   })
 
-  it('bubbles errors from handshake failures properly', (done) => {
+  it('bubbles errors from handshake failures properly', async () => {
     const p = pair()
     const timeout = 60 * 1000 * 5
-    const stateA = new State(peerA, peerC, timeout, () => { })
-    const stateB = new State(peerB, peerA, timeout, () => { })
+    const stateA = new State(peerA, peerC, timeout)
+    const stateB = new State(peerB, peerA, timeout)
     const connA = new Connection(p[0])
     const connB = new Connection(p[1])
 
-    function finish (err) {
-      expect(err).to.exist()
-      done()
-    }
-
     pull(
       connA,
-      handshake(stateA, finish),
+      handshake(stateA),
       connA
     )
 
     pull(
       connB,
-      handshake(stateB, finish),
+      handshake(stateB),
       connB
     )
+
+    let err
+
+    err = await catcher(stateA.awaitConnected)
+    expect(err).to.exist()
+
+    err = await catcher(stateB.awaitConnected)
+    expect(err).to.exist()
   })
 })
